@@ -1,9 +1,7 @@
 from math import floor
-from ast import literal_eval
 import torch
 from torch import nn
-from typing import Callable, List, Optional, Sequence, Tuple, Union
-
+from typing import Callable, List, Union
 
 
 class LinearBlock(nn.Module):
@@ -13,7 +11,7 @@ class LinearBlock(nn.Module):
     - Normalization layer (as Batch Normalization or Layer Normalization);
     - Nonlinear activation function;
     - Dropout layer.
-    
+
     Args:
         in_features (int): Size of each input sample.
         out_features (int): Size of each output sample.
@@ -28,36 +26,28 @@ class LinearBlock(nn.Module):
             Defaults to "lnad".
     """
     def __init__(self, *args, in_features: int, out_features: int, bias: bool = True,
-                 norm_layer: Callable[..., nn.Module] = None,
-                 activation_function: Callable[..., nn.Module] = None,
+                 norm_layer: Callable[..., nn.Module] = None, norm_layer_args: dict = {},
+                 activation_function: Callable[..., nn.Module] = None, activation_function_args: dict={},
                  dropout_prob: float = 0.0,
                  layers_order: Union[str, List[str]] = "lnad",
                  **kwargs):
         super().__init__(*args, **kwargs)
-        
-        layers_dict = {}
 
-        self.linear_layer = nn.Linear(in_features=in_features, out_features=out_features, bias=bias)
-        layers_dict["l"] = self.linear_layer
+        self.layers_order = layers_order
+        self.layers_dict = {"l": None, "n": None, "a": None, "d": None}
+
+        self.layers_dict["l"] = nn.Linear(in_features=in_features,
+                                          out_features=out_features,
+                                          bias=bias)
 
         if norm_layer is not None:
-            self.norm_layer = norm_layer
-            layers_dict["n"] = nn.BatchNorm1d(out_features)
-        else:
-            layers_dict["n"] = nn.Identity()
-            
+            self.layers_dict["n"] = norm_layer(**norm_layer_args)
+
         if activation_function is not None:
-            if activation_function not in torch.nn.modules.activation.__all__:
-                raise TypeError("That activation function doesn't exist")
-            else:
-                layers_dict["a"] = literal_eval("nn." + activation_function + "()")
-        else:
-            layers_dict["a"] = nn.Identity()
+            self.layers_dict["a"] = activation_function(**activation_function_args)
 
         if dropout_prob == 0.0:
-            layers_dict["n"] = nn.Dropout(dropout_prob)
-        else:
-            layers_dict["n"] = nn.Identity()
+            self.layers_dict["d"] = nn.Dropout(dropout_prob)
 
         self.out_features = out_features
 
@@ -65,48 +55,70 @@ class LinearBlock(nn.Module):
         return {"H_out": self.out_features}
 
     def forward(self, input):
-        output = self.linear_layer(input)
+        for layer in self.layers_order:
+            if self.layers_dict[layer] is not None:            
+                input = self.layers_dict[layer](input)
 
-        if self.norm:
-            output = self.norm_layer(output)
-
-        output = self.activation_layer(output)
-
-        if self.dropout != 0.0:
-            output = self.dropout_layer(output)
-
-        return output
+        return input
 
 
 class Conv1dBlock(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, bias: bool = True,
+    """
+    A custom neural network module consisting of:
+    - One dimensional convulational layer ``nn.Conv1d``;
+    - Normalization layer (as Batch Normalization or Layer Normalization);
+    - Nonlinear activation function;
+    - Dropout layer.
+    - Pooling layer (maxpool or averagepool).
+
+    Args:
+        in_features (int): Size of each input sample.
+        out_features (int): Size of each output sample.
+        bias (bool): If set to ``False``, the linear layer will not learn an additive bias.
+            Defaults to ``True``.
+        norm_layer (Callable[..., torch.nn.Module]): Normalization layer.
+            If set ``None`` this layer won't be used (Default).
+        activation_function (Callable[..., torch.nn.Module]): Nonlinear activation function.
+            If set ``None`` will use identity function (Default).
+        dropout_prob (float): The probability for the dropout layer. Defaults to 0.0.
+        pooling_layer (Callable[..., torch.nn.Module]): Pooling layer.
+            If set ``None`` this layer won't be used (Default).
+        layer_order (Union[str, List[str]]): Representation of the layer's ordering.
+            Defaults to "cnadp".
+    """
+    def __init__(self, *args, in_channels: int, out_channels: int, kernel_size: int, bias: bool = True,
                  stride: int = 1, padding: int = 0, dilation: int = 1,
-                 norm: bool = False,
-                 activation_function: str = None,
+                 norm_layer: Callable[..., nn.Module] = None, norm_layer_args: dict = {},
+                 activation_function: Callable[..., nn.Module] = None, activation_function_args: dict = {},
                  dropout_prob: float = 0.0,
-                 maxpool_kernel_size: int = None,
-                 maxpool_stride: int = None, maxpool_padding: int = 0, maxpool_dilation: int = 1,
-                 *args, **kwargs):
+                 pooling_layer: Callable[..., nn.Module] = None, pooling_layer_args: dict = {},
+                 layers_order: Union[str, List[str]] = "cnadp",
+                 **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.conv_layer = nn.Conv1d(in_channels=in_channels, out_channels=out_channels,
-                                      kernel_size=kernel_size, bias=bias,
-                                      stride=stride, padding=padding, dilation=dilation)
+        self.layers_order = layers_order
+        self.layers_dict = {"c": None, "n": None, "a": None, "d": None, "p": None}
 
-        self.norm = norm
-        if norm:
-            self.norm_layer = nn.BatchNorm1d(out_channels)
+        self.layers_dict["c"] = nn.Conv1d(
+            in_channels=in_channels, out_channels=out_channels,
+            kernel_size=kernel_size, bias=bias,
+            stride=stride, padding=padding, dilation=dilation)
 
-        if activation_function not in torch.nn.modules.activation.__all__:
-            raise TypeError("That activation function doesn't exist")
-        self.activation_layer = eval("nn." + activation_function + "()")
+        if norm_layer is not None:
+            self.layers_dict["n"] = norm_layer(**norm_layer_args)
 
-        self.dropout = dropout_prob
-        if dropout_prob != 0.0:
-            self.dropout_layer = nn.Dropout1d(dropout_prob)
+        if activation_function is not None:
+            self.layers_dict["a"] = activation_function(**activation_function_args)
 
-        self.maxpool_layer = nn.MaxPool1d(kernel_size=maxpool_kernel_size,
-                                          stride=maxpool_stride, padding=maxpool_padding, dilation=maxpool_dilation)
+        if dropout_prob == 0.0:
+            self.layers_dict["d"] = nn.Dropout(dropout_prob)
+
+        if pooling_layer is not None:
+            self.layers_dict["p"] = pooling_layer(**pooling_layer_args)
+            self.pool_kernel_size = self.layers_dict["p"].kernel_size
+            self.pool_stride = self.layers_dict["p"].stride
+            self.pool_padding = self.layers_dict["p"].padding
+            self.pool_dilation = self.layers_dict["p"].dilation
 
         self.out_channels = out_channels
 
@@ -115,35 +127,20 @@ class Conv1dBlock(nn.Module):
         self.padding = padding
         self.dilation = dilation
 
-        self.maxpool_kernel_size = maxpool_kernel_size
-        if maxpool_stride is None:
-            self.maxpool_stride = maxpool_kernel_size
-        else:
-            self.maxpool_stride = maxpool_stride
-        self.maxpool_padding = maxpool_padding
-        self.maxpool_dilation = maxpool_dilation
-
     def output_shape(self, L_in):
         L_out = floor((L_in + 2 * self.padding - self.dilation * (self.kernel_size - 1) - 1) / self.stride + 1)
-        L_out = floor((L_out + 2 * self.maxpool_padding - self.maxpool_dilation * (
-                self.maxpool_kernel_size - 1) - 1) / self.maxpool_stride + 1)
+        if self.layers_dict["p"] is not None:
+            L_out = floor((L_out + 2 * self.pool_padding - self.pool_dilation * (
+                    self.pool_kernel_size - 1) - 1) / self.pool_stride + 1)
 
         return {"C_out": self.out_channels, "L_out": L_out}
 
     def forward(self, input):
-        output = self.conv_layer(input)
+        for layer in self.layers_order:
+            if self.layers_dict[layer] is not None:            
+                input = self.layers_dict[layer](input)
 
-        if self.norm:
-            output = self.norm_layer(output)
-
-        output = self.activation_layer(output)
-
-        if self.dropout != 0.0:
-            output = self.dropout_layer(output)
-
-        output = self.maxpool_layer(output)
-
-        return output
+        return input
 
 
 class Conv2dBlock(nn.Module):
