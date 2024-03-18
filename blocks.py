@@ -117,8 +117,15 @@ class Conv1dBlock(nn.Module):
             self.layers_dict["p"] = pooling_layer(**pooling_layer_args)
             self.pool_kernel_size = self.layers_dict["p"].kernel_size
             self.pool_stride = self.layers_dict["p"].stride
-            self.pool_padding = self.layers_dict["p"].padding
-            self.pool_dilation = self.layers_dict["p"].dilation
+            try:
+                self.pool_padding = self.layers_dict["p"].padding
+            except AttributeError:
+                self.pool_padding = 0
+            try:
+                self.pool_dilation = self.layers_dict["p"].dilation
+            except AttributeError:
+                self.pool_dilation = 1
+                
 
         self.out_channels = out_channels
 
