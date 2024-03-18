@@ -115,18 +115,29 @@ class Conv1dBlock(nn.Module):
 
         if pooling_layer is not None:
             self.layers_dict["p"] = pooling_layer(**pooling_layer_args)
+            
             self.pool_kernel_size = self.layers_dict["p"].kernel_size
+            if isinstance(self.pool_kernel_size, tuple):
+                self.pool_kernel_size = self.pool_kernel_size[0]
+                
             self.pool_stride = self.layers_dict["p"].stride
+            if isinstance(self.pool_stride, tuple):
+                self.pool_stride = self.pool_stride[0]
+                
             try:
                 self.pool_padding = self.layers_dict["p"].padding
+                if isinstance(self.pool_padding, tuple):
+                    self.pool_padding = self.pool_padding[0]
             except AttributeError:
                 self.pool_padding = 0
+                
             try:
                 self.pool_dilation = self.layers_dict["p"].dilation
+                if isinstance(self.pool_dilation, tuple):
+                    self.pool_dilation = self.pool_dilation[0]
             except AttributeError:
                 self.pool_dilation = 1
                 
-
         self.out_channels = out_channels
 
         self.kernel_size = kernel_size
