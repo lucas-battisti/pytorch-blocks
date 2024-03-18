@@ -33,7 +33,6 @@ class LinearBlock(nn.Module):
                  **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.layers_order = layers_order
         self.layers_dict = {"l": None, "n": None, "a": None, "d": None}
 
         self.layers_dict["l"] = nn.Linear(in_features=in_features,
@@ -50,16 +49,17 @@ class LinearBlock(nn.Module):
             self.layers_dict["d"] = nn.Dropout(dropout_prob)
 
         self.out_features = out_features
+        
+        self.sequential = nn.Sequential()
+        for layer in layers_order:
+            if self.layers_dict[layer] is not None:            
+                self.sequential = self.sequential.append(self.layers_dict[layer])
 
     def output_shape(self):
         return {"H_out": self.out_features}
 
     def forward(self, input):
-        for layer in self.layers_order:
-            if self.layers_dict[layer] is not None:            
-                input = self.layers_dict[layer](input)
-
-        return input
+        return self.sequential(input)
 
 
 class Conv1dBlock(nn.Module):
@@ -95,8 +95,7 @@ class Conv1dBlock(nn.Module):
                  layers_order: Union[str, List[str]] = "cnadp",
                  **kwargs):
         super().__init__(*args, **kwargs)
-
-        self.layers_order = layers_order
+        
         self.layers_dict = {"c": None, "n": None, "a": None, "d": None, "p": None}
 
         self.layers_dict["c"] = nn.Conv1d(
@@ -137,13 +136,18 @@ class Conv1dBlock(nn.Module):
                     self.pool_dilation = self.pool_dilation[0]
             except AttributeError:
                 self.pool_dilation = 1
-                
+
         self.out_channels = out_channels
 
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
         self.dilation = dilation
+
+        self.sequential = nn.Sequential()
+        for layer in layers_order:
+            if self.layers_dict[layer] is not None:
+                self.sequential = self.sequential.append(self.layers_dict[layer])
 
     def output_shape(self, L_in):
         L_out = floor((L_in + 2 * self.padding - self.dilation * (self.kernel_size - 1) - 1) / self.stride + 1)
@@ -154,11 +158,7 @@ class Conv1dBlock(nn.Module):
         return {"C_out": self.out_channels, "L_out": L_out}
 
     def forward(self, input):
-        for layer in self.layers_order:
-            if self.layers_dict[layer] is not None:            
-                input = self.layers_dict[layer](input)
-
-        return input
+        return self.sequential(input)
 
 
 class Conv2dBlock(nn.Module):
