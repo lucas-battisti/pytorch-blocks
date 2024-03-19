@@ -45,7 +45,7 @@ class LinearBlock(nn.Module):
         if activation_function is not None:
             self.layers_dict["a"] = activation_function(**activation_function_args)
 
-        if dropout_prob == 0.0:
+        if dropout_prob != 0.0:
             self.layers_dict["d"] = nn.Dropout(dropout_prob)
 
         self.out_features = out_features
@@ -109,7 +109,7 @@ class Conv1dBlock(nn.Module):
         if activation_function is not None:
             self.layers_dict["a"] = activation_function(**activation_function_args)
 
-        if dropout_prob == 0.0:
+        if dropout_prob != 0.0:
             self.layers_dict["d"] = nn.Dropout(dropout_prob)
 
         if pooling_layer is not None:
