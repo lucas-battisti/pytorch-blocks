@@ -260,7 +260,7 @@ class Conv2dBlock(nn.Module):
         return self.sequential(input)
 
 
-
+'''
 class Conv2dBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int | tuple, bias: bool = True,
                  stride: int | tuple = 1, padding: int | tuple = 0, dilation: int | tuple = 1,
@@ -336,3 +336,4 @@ class Conv2dBlock(nn.Module):
         output = self.maxpool_layer(output)
 
         return output
+'''
